@@ -1,1 +1,159 @@
+//The QPADM
+#include <RcppArmadillo.h>
+//[[Rcpp::depends(RcppArmadillo)]]
+#include <chrono>
+using namespace Rcpp;
+using namespace arma;
 
+//The check loss function
+double checkloss(arma::vec u, double tau){
+  int num = u.size();
+  arma::vec loss(num, fill::zeros);
+  for(int j = 0; j < num; j++){
+    if(u(j) > 0) loss(j) = tau*u(j);
+    else loss(j) = (tau-1)*u(j);
+  }
+  return accu(loss); 
+}
+
+//The soft-thresholding solution of r
+arma::vec shrinkcpp(arma::vec u, arma::vec v){
+  arma::vec w=(1+sign(u-v))/2%(u-v)-(1+sign(-u-v))/2%(-u-v);
+  return w;
+}
+
+//The derivative of the penalty term
+arma::vec deriv(arma::vec beta, double a, double lambda, std::string penalty){
+  int p = beta.n_elem;
+  arma::vec df = arma::zeros(p);
+  if(penalty=="scad"){
+    for(int j=0;j<p;j++){
+      if(fabs(beta(j))<=lambda) df(j)=lambda;
+      else if(fabs(beta(j))<=a*lambda) df(j)=(a*lambda-fabs(beta(j)))/(a-1);
+    }
+  }else{
+    for(int j=0;j<p;j++){
+      if(fabs(beta(j))<=a*lambda) df(j)=lambda-fabs(beta(j))/a;
+    }
+  }
+  return df;
+}
+
+//The SCAD penalty
+double gscad(double z,double lambda,double a){
+  double pz;
+  if(abs(z) >= a*lambda)
+    pz = 0.5*(a+1)*lambda*lambda;
+  else if(abs(z) <= lambda)
+    pz = lambda*abs(z);
+  else
+    pz = (a*lambda*abs(z)-0.5*(z*z+lambda*lambda))/(a-1);
+  return pz;
+}
+
+//The SCAD penalty (sum)
+double gscad2(arma::vec z,double lambda,double a){
+  int num = z.size();
+  arma::vec pz(num, fill::zeros);
+  for(int j = 0; j < num; j++){
+    if(abs(z(j)) >= a*lambda)
+      pz(j) = 0.5*(a+1)*lambda*lambda;
+    else if(abs(z(j)) <= lambda)
+      pz(j) = lambda*abs(z(j));
+    else
+      pz(j) = (a*lambda*abs(z(j))-0.5*(z(j)*z(j)+lambda*lambda))/(a-1);
+  }
+  return sum(pz);
+}
+
+//The MCP penalty
+double gmcp(double z, double lambda, double a){  
+  double pz;
+  if(abs(z) > a*lambda)
+    pz = 0.5*a*lambda*lambda;
+  else
+    pz = lambda*abs(z)-0.5*z*z/a;
+  return pz; 
+}
+
+//The MCP penalty (sum)
+double gmcp2(arma::vec z, double lambda, double a){ 
+  int num = z.size();
+  arma::vec pz(num, fill::zeros);
+  for(int j = 0; j < num; j++){
+    if(abs(z(j)) > a*lambda)
+      pz(j) = 0.5*a*lambda*lambda;
+    else
+      pz(j) = lambda*abs(z(j))-0.5*z(j)*z(j)/a;
+  }
+  return sum(pz);
+}
+
+//The QPADM
+// [[Rcpp::export]]
+arma::mat QPADM(double eps, arma::mat xr,arma::vec yr,int iter,double ta,double rhor,double lambdar,double a,std::string penalty){
+  
+  int maxit=(iter);
+  double tau=(ta),rho=(rhor),lambda=(lambdar);
+  arma::mat x=(xr);
+  arma::vec y=(yr);
+  int n=x.n_rows,p=x.n_cols;
+  lambda = lambda/n;
+  arma::vec betaini=arma::zeros(p), beta_avgini=arma::zeros(p), rini=arma::zeros(n), uini=arma::zeros(n), eta_avgini=arma::zeros(p);
+  arma::vec df, xbeta;
+  arma::vec beta=arma::zeros(p), beta_avg=arma::zeros(p), r=arma::zeros(n), u=arma::zeros(n), eta_avg=arma::zeros(p);
+  xbeta = x*beta_avgini;
+  //arma::mat tracebeta(maxit, p+1, fill::zeros);
+  double lossold = 0, loss = 0, distance = 1, time = 0;
+  if(penalty=="mcp"){ 
+    lossold = checkloss(rini,tau)+gmcp2(betaini, lambda, a);
+  }
+  else{
+    lossold = checkloss(rini,tau)+gscad2(betaini, lambda, a);
+  }
+  auto start_pre = std::chrono::high_resolution_clock::now();
+  arma::mat tmp(p,p,fill::zeros);
+  if(n>p) 
+    tmp = inv(x.t()*x+arma::eye(p,p));
+  else tmp = arma::eye(p,p)-x.t()*inv(arma::eye(n,n)+x*x.t())*x;;
+  auto finish_pre = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_pre = finish_pre - start_pre;
+  time = time+elapsed_pre.count();
+  int iteration=0;
+  if((n>p)&&(tau==0.5))
+    eps=eps*10;
+  //while(iteration < maxit){ 
+  while((distance > eps)&&(iteration < maxit)){
+    auto start = std::chrono::high_resolution_clock::now();
+    df = deriv(betaini,a,lambda,penalty);
+    beta = shrinkcpp(beta_avgini+eta_avgini/rho,df/(rho));
+    r=shrinkcpp(uini/rho+y-xbeta-.5*(2*tau-1)/(n*rho),.5*arma::ones<arma::vec>(n)/(n*rho));
+    beta_avg=tmp*(x.t()*(y-r+uini/rho)-eta_avgini/rho+beta);
+    xbeta = x*beta_avg;
+    u=uini+rho*(y-xbeta-r);
+    eta_avg=eta_avgini+rho*(beta_avg-beta);
+    auto finish = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finish - start;
+    time = time + elapsed.count();
+    if(penalty=="mcp"){ 
+      loss = checkloss(r,tau)+gmcp2(beta, lambda, a);
+    }
+    else{
+      loss = checkloss(r,tau)+gscad2(beta, lambda, a);
+    }
+    distance = abs(loss-lossold);
+    //arma::vec lossbeta(p+1);
+    //lossbeta(0)= lossold;
+    //lossbeta.subvec(1,p) = beta;
+    //tracebeta.row(iteration) = lossbeta.t();
+    iteration = iteration + 1;
+    lossold = loss;
+    betaini = beta, rini = r, beta_avgini = beta_avg, uini = u, eta_avgini = eta_avg;
+  }
+  arma::vec betafinal(p+2);
+  betafinal.subvec(0,p-1)=beta;
+  betafinal(p)=iteration;
+  betafinal(p+1)=time;
+  return betafinal;
+  //return tracebeta;  
+}
