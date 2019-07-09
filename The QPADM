@@ -1,5 +1,6 @@
 //The QPADM
 #include <RcppArmadillo.h>
+//[[Rcpp::depends(RcppArmadillo)]]
 #include <chrono>
 using namespace Rcpp;
 using namespace arma;
@@ -88,7 +89,6 @@ double gmcp2(arma::vec z, double lambda, double a){
   return sum(pz);
 }
 
-
 //The QPADM
 // [[Rcpp::export]]
 arma::mat QPADM(double eps, arma::mat xr,arma::vec yr,int iter,double ta,double rhor,double lambdar,double a,std::string penalty){
@@ -124,7 +124,6 @@ arma::mat QPADM(double eps, arma::mat xr,arma::vec yr,int iter,double ta,double 
     eps=eps*10;
   //while(iteration < maxit){ 
   while((distance > eps)&&(iteration < maxit)){
-    
     auto start = std::chrono::high_resolution_clock::now();
     df = deriv(betaini,a,lambda,penalty);
     beta = shrinkcpp(beta_avgini+eta_avgini/rho,df/(rho));
