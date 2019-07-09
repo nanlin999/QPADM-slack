@@ -1,0 +1,204 @@
+//The QPADM-slack 
+#include <RcppArmadillo.h>
+#include <math.h>
+//[[Rcpp::depends(RcppArmadillo)]]
+using namespace Rcpp;
+using namespace arma;
+using namespace std;
+
+//Covariance matrix
+arma::mat gcov(int p, double rho){
+  arma::mat cov(p, p, fill::eye);
+  for(int i = 0; i < p; i++){
+    for(int j = 0; j < p; j++){
+      if(i < j) cov(i,j) = pow(rho, j-i);
+      else cov(i,j) = cov(j,i);
+    }
+  }
+  return cov;
+}
+
+//The SCAD penalty
+double gscad(double z,double lambda,double a){ 
+  double pz;
+  if(abs(z) >= a*lambda)
+    pz = 0.5*(a+1)*lambda*lambda;
+  else if(abs(z) <= lambda)
+    pz = lambda*abs(z);
+  else
+    pz = (a*lambda*abs(z)-0.5*(z*z+lambda*lambda))/(a-1);
+  return pz;
+}
+
+//The SCAD penalty (sum)
+double gscad2(arma::vec z,double lambda,double a){
+  int num = z.size();
+  arma::vec pz(num, fill::zeros);
+  for(int j = 0; j < num; j++){
+    if(abs(z(j)) >= a*lambda)
+      pz(j) = 0.5*(a+1)*lambda*lambda;
+    else if(abs(z(j)) <= lambda)
+      pz(j) = lambda*abs(z(j));
+    else
+      pz(j) = (a*lambda*abs(z(j))-0.5*(z(j)*z(j)+lambda*lambda))/(a-1);
+  }
+  return sum(pz);
+}
+
+//The MCP penalty
+double gmcp(double z, double lambda, double a){
+  double pz;
+  if(abs(z) > a*lambda)
+    pz = 0.5*a*lambda*lambda;
+  else
+    pz = lambda*abs(z)-0.5*z*z/a;
+  return pz; 
+}
+
+//The MCP penalty (sum)
+double gmcp2(arma::vec z, double lambda, double a){ 
+  int num = z.size();
+  arma::vec pz(num, fill::zeros);
+  for(int j = 0; j < num; j++){
+    if(abs(z(j)) > a*lambda)
+      pz(j) = 0.5*a*lambda*lambda;
+    else
+      pz(j) = lambda*abs(z(j))-0.5*z(j)*z(j)/a;
+  }
+  return sum(pz);
+}
+
+//The checkloss function
+double checkloss(arma::vec u, double tau){
+  int num = u.size();
+  arma::vec loss(num, fill::zeros);
+  for(int j = 0; j < num; j++){
+    if(u(j) > 0) loss(j) = tau*u(j);
+    else loss(j) = (tau-1)*u(j);
+  }
+  return accu(loss); 
+}
+
+//maxfunction
+double maxf(double a, double b){
+  if(a>=b)
+    return a;
+  else
+    return b;
+}
+
+//minfunction
+double minf(double a, double b){
+  if(a<b)
+    return a;
+  else
+    return b;
+}
+
+//The QPADM-slack
+//[[Rcpp::export]]
+arma::mat slackxietaCPP(double eps, arma::vec y, arma::mat x, double tau, double lambda, double a, double pho, String funname, int maxstep){
+  int n = x.n_rows, p = x.n_cols;
+  arma::vec betaini(p, fill::zeros), zini(p, fill::zeros), uini(p, fill::zeros);
+  arma::vec xiini(n, fill::zeros), etaini(n, fill::zeros), vini(n, fill::zeros);
+  arma::vec beta(p, fill::ones), z(p, fill::ones), u(p, fill::zeros);
+  arma::vec xi(n, fill::zeros), eta(n, fill::zeros), v(n, fill::zeros);
+  arma::vec yx = y-x*zini;
+  //arma::mat tracebeta(maxstep, p+1, fill::zeros);
+  double lossold = 0, loss = 0, distance = 1, time = 0;
+  int iteration = 0;
+  if(funname == "mcp"){
+    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gmcp2(betaini, lambda, a);
+  }
+  else{
+    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gscad2(betaini, lambda, a);
+  }
+  auto start_pre = std::chrono::high_resolution_clock::now();
+  arma::mat tmp(p,p,fill::zeros);
+  if(n>p){
+    tmp = inv(arma::eye(p,p)+x.t()*x);
+  }
+  else{
+    tmp = arma::eye(p,p)-x.t()*inv(arma::eye(n,n)+x*x.t())*x;
+  }
+  auto finish_pre = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_pre = finish_pre - start_pre;
+  time = time+elapsed_pre.count();
+  if(tau==0.5){
+    eps=eps*10;
+  }
+  while((distance > eps)&&(iteration < maxstep)){
+  //while((iteration < maxstep)){
+    auto start = std::chrono::high_resolution_clock::now();
+    if(funname == "mcp"){ 
+      for(int j=0;j<p;j++){
+        double phi = zini(j)+uini(j)/pho; 
+        arma::vec xx(3, fill::zeros);
+        xx(0) = sign(phi)*minf(a*lambda, maxf(0, a*(pho*abs(phi)-lambda)/(pho*a-1)));
+        xx(1) = sign(phi)*maxf(a*lambda, abs(phi));
+        arma::vec h(3, fill::zeros);
+        for(int i = 0; i < 3; i++){
+          h(i) = 0.5*(xx(i)-phi)*(xx(i)-phi)+gmcp(xx(i), lambda, a)/pho; 
+        }
+        beta(j) = xx(h.index_min());  
+      }
+      
+    }
+    else{ 
+      for(int j = 0; j < p; j++){ 
+        double phi = zini(j)+uini(j)/pho;
+        arma::vec xx(4, fill::zeros);
+        xx(0) = sign(phi)*minf(lambda, maxf(0, abs(phi)-lambda/pho));
+        xx(1) = sign(phi)*minf(a*lambda, maxf(lambda, (pho*(a-1)*abs(phi)-a*lambda)/(pho*(a-1)-1)));
+        xx(2) = sign(phi)*maxf(a*lambda, abs(phi));
+        arma::vec h(4, fill::zeros);
+        for(int i = 0; i < 4; i++){
+          h(i) = 0.5*(xx(i)-phi)*(xx(i)-phi)+gscad(xx(i), lambda, a)/pho; 
+        }
+        beta(j) = xx(h.index_min()); 
+      } 
+    }
+    xi = yx+etaini+vini/pho-tau*arma::ones(n)/pho;
+    for(int i=0;i<n;i++){
+      if(xi(i)<0){
+        xi(i) = 0;
+      }
+    }
+    eta = -yx+xi-vini/pho-(1-tau)*arma::ones(n)/pho;
+    for(int i=0;i<n;i++){
+      if(eta(i)<0){
+        eta(i) = 0;
+      }
+    }
+    z = tmp*(beta-uini/pho+x.t()*(y-xi+eta+vini/pho));
+    yx = y-x*z;
+    u = uini+pho*(z-beta);
+    v = vini+pho*(yx-xi+eta);
+    auto finish = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finish - start;
+    time = time + elapsed.count();
+    if(funname == "mcp"){
+      loss = tau*accu(xi)+(1-tau)*accu(eta)+gmcp2(beta, lambda, a);
+    }
+    else{
+      loss = tau*accu(xi)+(1-tau)*accu(eta)+gscad2(beta, lambda, a);
+    }
+    distance = abs(lossold-loss);
+    //arma::vec lossbeta(p+1);
+    //lossbeta(0)= lossold;
+    //lossbeta.subvec(1,p) = beta;
+    //tracebeta.row(iteration) = lossbeta.t();
+    lossold = loss;
+    betaini = beta, zini = z, uini = u;
+    xiini = xi, etaini = eta, vini=v;
+    iteration = iteration+1; 
+  }  
+  arma::vec betafinal(p+2);
+  betafinal.subvec(0, p-1)= beta;
+  betafinal(p) = iteration;
+  betafinal(p+1) = time;
+  return betafinal;
+  //return tracebeta;  
+}
+
+
