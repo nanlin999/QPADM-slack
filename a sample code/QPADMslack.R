@@ -20,6 +20,6 @@ X[,1] = pnorm(X[,1])
 e = rnorm(n)
 Y = X[,6]+X[,12]+X[,15]+X[,20]+0.7*X[,1]*e
 QPADMslack_scad = QPADMslack(1e-03, Y, X, 0.3, 15, 3.7, 1, "scad", 500)
-beta_qadmm_scad3 = QPADMslack_scad[1:p]
+beta_qadmm_scad = QPADMslack_scad[1:p]
 step = QPADMslack_scad[p+1]
 time = QPADMslack_scad[p+2]
