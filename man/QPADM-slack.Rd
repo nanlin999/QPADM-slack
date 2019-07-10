@@ -1,7 +1,7 @@
 \name{QPADM-slack}
 \title{Penalized quantile regression Using the Slack Variable Representation}
 \usage{
-QPADMslack(eps, y, x, tau, lambda, a, pho, funname, maxstep){
+QPADMslack(eps, y, x, tau, lambda, a, pho, funname, maxstep)
 }
 \arguments{
 \item{eps}{The terminate condition}
@@ -40,8 +40,8 @@ X = X%*%chol(cov)
 X[,1] = pnorm(X[,1])
 e = rnorm(n)
 Y = X[,6]+X[,12]+X[,15]+X[,20]+0.7*X[,1]*e
-slack_scad = QPADMslack(1e-03, Y, X, 0.3, 15, 3.7, 1, "scad", 500)
-beta_qadmm_scad3 = slack_scad[1:p]
-step = slack_scad[p+1,]
-time = slack_scad[p+2,]
+QPADMslack_scad = QPADMslack(1e-03, Y, X, 0.3, 15, 3.7, 1, "scad", 500)
+beta_qadmm_scad3 = QPADMslack_scad[1:p]
+step = QPADMslack_scad[p+1,]
+time = QPADMslack_scad[p+2,]
 }
