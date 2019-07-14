@@ -22,7 +22,7 @@ arma::vec shrinkcpp(arma::vec u, arma::vec v){
   return w;
 }
 
-//The derivative of the penalty term
+//The first order derivative of the penalty term
 arma::vec deriv(arma::vec beta, double a, double lambda, std::string penalty){
   int p = beta.n_elem;
   arma::vec df = arma::zeros(p);
@@ -37,18 +37,6 @@ arma::vec deriv(arma::vec beta, double a, double lambda, std::string penalty){
     }
   }
   return df;
-}
-
-//The SCAD penalty
-double gscad(double z,double lambda,double a){
-  double pz;
-  if(abs(z) >= a*lambda)
-    pz = 0.5*(a+1)*lambda*lambda;
-  else if(abs(z) <= lambda)
-    pz = lambda*abs(z);
-  else
-    pz = (a*lambda*abs(z)-0.5*(z*z+lambda*lambda))/(a-1);
-  return pz;
 }
 
 //The SCAD penalty (sum)
@@ -66,15 +54,6 @@ double gscad2(arma::vec z,double lambda,double a){
   return sum(pz);
 }
 
-//The MCP penalty
-double gmcp(double z, double lambda, double a){  
-  double pz;
-  if(abs(z) > a*lambda)
-    pz = 0.5*a*lambda*lambda;
-  else
-    pz = lambda*abs(z)-0.5*z*z/a;
-  return pz; 
-}
 
 //The MCP penalty (sum)
 double gmcp2(arma::vec z, double lambda, double a){ 
@@ -106,10 +85,10 @@ arma::mat QPADM(double eps, arma::mat xr,arma::vec yr,int iter,double ta,double 
   //arma::mat tracebeta(maxit, p+1, fill::zeros);
   double lossold = 0, loss = 0, distance = 1, time = 0;
   if(penalty=="mcp"){ 
-    lossold = checkloss(rini,tau)+gmcp2(betaini, lambda, a);
+    lossold = checkloss(rini,tau)/n+gmcp2(betaini, lambda, a);
   }
   else{
-    lossold = checkloss(rini,tau)+gscad2(betaini, lambda, a);
+    lossold = checkloss(rini,tau)/n+gscad2(betaini, lambda, a);
   }
   auto start_pre = std::chrono::high_resolution_clock::now();
   arma::mat tmp(p,p,fill::zeros);
@@ -120,8 +99,6 @@ arma::mat QPADM(double eps, arma::mat xr,arma::vec yr,int iter,double ta,double 
   std::chrono::duration<double> elapsed_pre = finish_pre - start_pre;
   time = time+elapsed_pre.count();
   int iteration=0;
-  if((n>p)&&(tau==0.5))
-    eps=eps*10;
   //while(iteration < maxit){ 
   while((distance > eps)&&(iteration < maxit)){
     auto start = std::chrono::high_resolution_clock::now();
@@ -136,10 +113,10 @@ arma::mat QPADM(double eps, arma::mat xr,arma::vec yr,int iter,double ta,double 
     std::chrono::duration<double> elapsed = finish - start;
     time = time + elapsed.count();
     if(penalty=="mcp"){ 
-      loss = checkloss(r,tau)+gmcp2(beta, lambda, a);
+      loss = checkloss(r,tau)/n+gmcp2(beta, lambda, a);
     }
     else{
-      loss = checkloss(r,tau)+gscad2(beta, lambda, a);
+      loss = checkloss(r,tau)/n+gscad2(beta, lambda, a);
     }
     distance = abs(loss-lossold);
     //arma::vec lossbeta(p+1);
