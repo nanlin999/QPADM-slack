@@ -7,6 +7,7 @@ using namespace arma;
 using namespace std;
 
 //Covariance matrix
+//[[Rcpp::export]]
 arma::mat gcov(int p, double rho){
   arma::mat cov(p, p, fill::eye);
   for(int i = 0; i < p; i++){
@@ -69,17 +70,6 @@ double gmcp2(arma::vec z, double lambda, double a){
   return sum(pz);
 }
 
-//The checkloss function
-double checkloss(arma::vec u, double tau){
-  int num = u.size();
-  arma::vec loss(num, fill::zeros);
-  for(int j = 0; j < num; j++){
-    if(u(j) > 0) loss(j) = tau*u(j);
-    else loss(j) = (tau-1)*u(j);
-  }
-  return accu(loss); 
-}
-
 //maxfunction
 //[[Rcpp::export]]
 double maxf(double a, double b){
@@ -111,10 +101,10 @@ arma::mat QPADMslack(double eps, arma::vec y, arma::mat x, double tau, double la
   double lossold = 0, loss = 0, distance = 1, time = 0;
   int iteration = 0;
   if(funname == "mcp"){
-    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gmcp2(betaini, lambda, a);
+    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gmcp2(betaini, lambda, a)/n;
   }
   else{
-    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gscad2(betaini, lambda, a);
+    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gscad2(betaini, lambda, a)/n;
   }
   auto start_pre = std::chrono::high_resolution_clock::now();
   arma::mat tmp(p,p,fill::zeros);
@@ -127,9 +117,6 @@ arma::mat QPADMslack(double eps, arma::vec y, arma::mat x, double tau, double la
   auto finish_pre = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed_pre = finish_pre - start_pre;
   time = time+elapsed_pre.count();
-  if(tau==0.5){
-    eps=eps*10;
-  }
   while((distance > eps)&&(iteration < maxstep)){
   //while((iteration < maxstep)){
     auto start = std::chrono::high_resolution_clock::now();
@@ -180,10 +167,10 @@ arma::mat QPADMslack(double eps, arma::vec y, arma::mat x, double tau, double la
     std::chrono::duration<double> elapsed = finish - start;    
     time = time + elapsed.count();    
     if(funname == "mcp"){
-      loss = tau*accu(xi)+(1-tau)*accu(eta)+gmcp2(beta, lambda, a);
+      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gmcp2(beta, lambda, a)/n;
     }
     else{
-      loss = tau*accu(xi)+(1-tau)*accu(eta)+gscad2(beta, lambda, a);
+      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gscad2(beta, lambda, a)/n;
     }    
     distance = abs(lossold-loss);    
     //arma::vec lossbeta(p+1);
