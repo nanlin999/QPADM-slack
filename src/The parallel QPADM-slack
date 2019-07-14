@@ -8,6 +8,7 @@ using namespace arma;
 using namespace std;
 
 //Covariance matrix
+//[[Rcpp::depends(RcppArmadillo)]]
 arma::mat gcov(int p, double rho){
   arma::mat cov(p, p, fill::eye);
   for(int i = 0; i < p; i++){
@@ -69,15 +70,20 @@ double gmcp2(arma::vec z, double lambda, double a){
   return sum(pz);
 }
 
-//The checkloss function
-double checkloss(arma::vec u, double tau){
-  int num = u.size();
-  arma::vec loss(num, fill::zeros);
-  for(int j = 0; j < num; j++){
-    if(u(j) > 0) loss(j) = tau*u(j);
-    else loss(j) = (tau-1)*u(j);
-  }
-  return accu(loss); 
+//maxfunction
+double maxf(double a, double b){
+  if(a>=b)
+    return a;
+  else
+    return b;
+}
+
+//minfunction
+double minf(double a, double b){
+  if(a<b)
+    return a;
+  else
+    return b;
 }
 
 //The parallel QPADM-slack
@@ -99,10 +105,10 @@ arma::mat QPADMslackpara(double eps, arma::vec y, arma::mat x, arma::vec betatru
   arma::vec map(K, fill::zeros);
   double distance = 1, lossold = 0, loss = 0; 
   if(funname == "mcp"){
-    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gmcp2(betaini, lambda, a);
+    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gmcp2(betaini, lambda, a)/n;
   }
   else{
-    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gscad2(betaini, lambda, a);
+    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gscad2(betaini, lambda, a)/n;
   }
   arma::cube tmp=arma::zeros<arma::cube>(p,p,K);
   for(int k=0;k<K;k++){
@@ -118,9 +124,7 @@ arma::mat QPADMslackpara(double eps, arma::vec y, arma::mat x, arma::vec betatru
   }
   time = time + max_prep;
   int iteration = 0;
-  if(tau == 0.5){
-    eps=eps/K*100;
-  }
+
   while((distance > eps)&&(iteration < maxstep)){
   //while((iteration < maxstep)){
     zinimean = mean(zini,1);
@@ -183,10 +187,10 @@ arma::mat QPADMslackpara(double eps, arma::vec y, arma::mat x, arma::vec betatru
     max_map = map(map.index_max());
     time = time + max_map;
     if(funname == "mcp"){
-      loss = tau*accu(xi)+(1-tau)*accu(eta)+gmcp2(beta, lambda, a);
+      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gmcp2(beta, lambda, a)/n;
     }
     else{
-      loss = tau*accu(xi)+(1-tau)*accu(eta)+gscad2(beta, lambda, a);
+      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gscad2(beta, lambda, a)/n;
     }
     distance = abs(loss-lossold);
     traceloss(iteration) = lossold;
