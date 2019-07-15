@@ -101,10 +101,10 @@ arma::mat QPADMslack(double eps, arma::vec y, arma::mat x, double tau, double la
   double lossold = 0, loss = 0, distance = 1, time = 0;
   int iteration = 0;
   if(funname == "mcp"){
-    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gmcp2(betaini, lambda, a)/n;
+    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gmcp2(betaini, lambda, a);
   }
   else{
-    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gscad2(betaini, lambda, a)/n;
+    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gscad2(betaini, lambda, a);
   }
   auto start_pre = std::chrono::high_resolution_clock::now();
   arma::mat tmp(p,p,fill::zeros);
@@ -167,10 +167,10 @@ arma::mat QPADMslack(double eps, arma::vec y, arma::mat x, double tau, double la
     std::chrono::duration<double> elapsed = finish - start;    
     time = time + elapsed.count();    
     if(funname == "mcp"){
-      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gmcp2(beta, lambda, a)/n;
+      loss = tau*accu(xi)+(1-tau)*accu(eta)+gmcp2(beta, lambda, a);
     }
     else{
-      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gscad2(beta, lambda, a)/n;
+      loss = tau*accu(xi)+(1-tau)*accu(eta)+gscad2(beta, lambda, a);
     }    
     distance = abs(lossold-loss);    
     //arma::vec lossbeta(p+1);
