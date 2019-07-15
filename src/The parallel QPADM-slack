@@ -105,10 +105,10 @@ arma::mat QPADMslackpara(double eps, arma::vec y, arma::mat x, arma::vec betatru
   arma::vec map(K, fill::zeros);
   double distance = 1, lossold = 0, loss = 0; 
   if(funname == "mcp"){
-    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gmcp2(betaini, lambda, a)/n;
+    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gmcp2(betaini, lambda, a);
   }
   else{
-    lossold = tau*accu(xiini)/n+(1-tau)*accu(etaini)/n+gscad2(betaini, lambda, a)/n;
+    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gscad2(betaini, lambda, a);
   }
   arma::cube tmp=arma::zeros<arma::cube>(p,p,K);
   for(int k=0;k<K;k++){
@@ -187,10 +187,10 @@ arma::mat QPADMslackpara(double eps, arma::vec y, arma::mat x, arma::vec betatru
     max_map = map(map.index_max());
     time = time + max_map;
     if(funname == "mcp"){
-      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gmcp2(beta, lambda, a)/n;
+      loss = tau*accu(xi)+(1-tau)*accu(eta)+gmcp2(beta, lambda, a);
     }
     else{
-      loss = tau*accu(xi)/n+(1-tau)*accu(eta)/n+gscad2(beta, lambda, a)/n;
+      loss = tau*accu(xi)+(1-tau)*accu(eta)+gscad2(beta, lambda, a);
     }
     distance = abs(loss-lossold);
     traceloss(iteration) = lossold;
