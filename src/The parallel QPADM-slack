@@ -81,18 +81,8 @@ arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double
   arma::mat zini(p, K, fill::zeros), uini(p, K, fill::zeros), z(p, K, fill::zeros), u(p, K, fill::zeros);
   arma::vec xiini(n, fill::zeros), etaini(n, fill::zeros), vini(n, fill::zeros), betaini(p, fill::zeros);
   arma::vec xi(n, fill::zeros), eta(n, fill::zeros), v(n, fill::zeros), beta(p, fill::zeros);
-  arma::vec zinimean = mean(zini,1), uinimean = mean(uini,1);
-  arma::vec yx = y;
-  arma::vec final(3, fill::zeros);
+  arma::vec zinimean = mean(zini,1), uinimean = mean(uini,1), yx = y, value(2, fill::zeros), map(K, fill::zeros);
   double max_prep =0, time_reduce = 0, max_map = 0, time = 0;
-  arma::vec map(K, fill::zeros);
-  double distance = 1, lossold = 0, loss = 0; 
-  if(funname == "mcp"){
-    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gmcp2(betaini, lambda, a);
-  }
-  else{
-    lossold = tau*accu(xiini)+(1-tau)*accu(etaini)+gscad2(betaini, lambda, a);
-  }
   arma::cube tmp=arma::zeros<arma::cube>(p,p,K);
   for(int k=0;k<K;k++){
     arma::mat tmp2, xk=x.rows(k*nk,k*nk+nk-1);
@@ -167,18 +157,10 @@ arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double
     }
     max_map = map(map.index_max());
     time = time + max_map;
-    if(funname == "mcp"){
-      loss = tau*accu(xi)+(1-tau)*accu(eta)+gmcp2(beta, lambda, a);
-    }
-    else{
-      loss = tau*accu(xi)+(1-tau)*accu(eta)+gscad2(beta, lambda, a);
-    }
-    distance = abs(loss-lossold);
-    lossold = loss, betaini = beta, zini = z, uini = u, xiini = xi, etaini = eta, vini=v;
+    betaini = beta, zini = z, uini = u, xiini = xi, etaini = eta, vini=v;
     iteration = iteration+1;
   }    
-  final(0) = sum(abs(beta-betatrue));
-  final(1) = time;
-  final(2) = iteration;
-  return final;
+  value(0) = sum(abs(beta-betatrue));
+  value(1) = time;
+  return value;
 }
