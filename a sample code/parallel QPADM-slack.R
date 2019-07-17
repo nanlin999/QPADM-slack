@@ -1,9 +1,8 @@
 # Penalized quantile regression Using the Slack Variable Representation. This is a parallel implementation. 
 # The QPADMslackpara() function is written using Rcpp. To use the code, we should install the R package, "Rcpp", first.
 # QPADMslackpara(eps, y, x, betatrue, tau, lambda, a, pho, K, funname, maxstep)
-# "eps" The terminate condition
 # "y" The response vector
-# "x" The design matrix (with intercept)
+# "x" The design matrix (without intercept)
 # "betatrue" The real value of the coefficient
 # "tau" The quantile of interest
 # "lambda" The penalization parameter
@@ -12,7 +11,8 @@
 # "K" The number of partitions
 # "funname" Name of the penalty to use, currently support ("scad","mcp")
 # "maxstep" Maximum number of iterations allowed
-# value: The absolute estimation error of the coefficient, the number of iterations and the running time
+# "intercept" Whether to include the intercept into the model
+# value: The absolute estimation error of the coefficient and the running time
 n = 300000
 p = 100
 K = 100
@@ -26,7 +26,6 @@ e = rnorm(n)
 Y = X[,6]+X[,12]+X[,15]+X[,20]+0.7*X[,1]*e
 beta_true[1] = 0.7*qnorm(0.7)
 beta_true[6] = beta_true[12] = beta_true[15] = beta_true[20] = 1
-QPADMslackpara_scad = QPADMslackpara(1e-02, Y, X, beta_true, 0.7, 20, 3.7, 1, K, "scad", 500)
+QPADMslackpara_scad = QPADMslackparaCPP(Y, X, beta_true, 0.7, 20, 3.7, 1, K, "scad", 150, FALSE)
 AE = QPADMslackpara_scad[1]
 time = QPADMslackpara_scad[2]
-step = QPADMslackpara_scad[3]
