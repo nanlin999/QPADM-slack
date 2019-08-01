@@ -32,21 +32,6 @@ double gscad(double z,double lambda,double a){
   return pz;
 }
 
-//The SCAD penalty (sum)
-double gscad2(arma::vec z,double lambda,double a){  
-  int num = z.size();
-  arma::vec pz(num, fill::zeros);
-  for(int j = 0; j < num; j++){
-    if(abs(z(j)) >= a*lambda)
-      pz(j) = 0.5*(a+1)*lambda*lambda;
-    else if(abs(z(j)) <= lambda)
-      pz(j) = lambda*abs(z(j));
-    else
-      pz(j) = (a*lambda*abs(z(j))-0.5*(z(j)*z(j)+lambda*lambda))/(a-1);
-  }
-  return sum(pz);
-}
-
 //The MCP penalty
 double gmcp(double z, double lambda, double a){ 
   double pz;
@@ -57,22 +42,9 @@ double gmcp(double z, double lambda, double a){
   return pz;  
 }
 
-//The MCP penalty (sum)
-double gmcp2(arma::vec z, double lambda, double a){ 
-  int num = z.size();
-  arma::vec pz(num, fill::zeros);
-  for(int j = 0; j < num; j++){
-    if(abs(z(j)) > a*lambda)
-      pz(j) = 0.5*a*lambda*lambda;
-    else
-      pz(j) = lambda*abs(z(j))-0.5*z(j)*z(j)/a;
-  }
-  return sum(pz);
-}
-
 //The parallel QPADM-slack
 //[[Rcpp::export]]
-arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double tau, double lambda, double a, double pho, int K, String funname, int maxstep, bool intercept){  
+arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double tau, double lambda, double a, double pho, int K, String funname, int maxstep, double eps, bool intercept){  
   int n = x.n_rows, nk = n/K;
   if(intercept){
     x.insert_cols(0, arma::ones(n));
@@ -81,8 +53,9 @@ arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double
   arma::mat zini(p, K, fill::zeros), uini(p, K, fill::zeros), z(p, K, fill::zeros), u(p, K, fill::zeros);
   arma::vec xiini(n, fill::zeros), etaini(n, fill::zeros), vini(n, fill::zeros), betaini(p, fill::zeros);
   arma::vec xi(n, fill::zeros), eta(n, fill::zeros), v(n, fill::zeros), beta(p, fill::zeros);
-  arma::vec zinimean = mean(zini,1), uinimean = mean(uini,1), yx = y, value(2, fill::zeros), map(K, fill::zeros);
-  double max_prep =0, time_reduce = 0, max_map = 0, time = 0;
+  arma::vec zinimean = mean(zini,1), uinimean = mean(uini,1), yx = y, value(3, fill::zeros), map(K, fill::zeros);
+  double max_prep =0, time_reduce = 0, max_map = 0, time = 0, distance = 1;
+  int iteration = 0;
   arma::cube tmp=arma::zeros<arma::cube>(p,p,K);
   for(int k=0;k<K;k++){
     arma::mat tmp2, xk=x.rows(k*nk,k*nk+nk-1);
@@ -96,8 +69,7 @@ arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double
     tmp.slice(k)=tmp2;
   }
   time = time + max_prep;
-  int iteration = 0;
-  while(iteration < maxstep){
+  while(((distance > eps)|(distance == 0))&&(iteration < maxstep)){
     zinimean = mean(zini,1);
     uinimean = mean(uini,1);
     auto start_reduce = std::chrono::high_resolution_clock::now();
@@ -157,10 +129,12 @@ arma::mat QPADMslackparaCPP(arma::vec y, arma::mat x, arma::vec betatrue, double
     }
     max_map = map(map.index_max());
     time = time + max_map;
+    distance = sum(abs(beta-betaini));
     betaini = beta, zini = z, uini = u, xiini = xi, etaini = eta, vini=v;
     iteration = iteration+1;
   }    
   value(0) = sum(abs(beta-betatrue));
   value(1) = time;
+  value(2) = iteration;
   return value;
 }
