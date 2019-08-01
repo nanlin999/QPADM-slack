@@ -9,11 +9,11 @@
 # "a" The shape parameter for the SCAD/MCP penalty
 # "pho" The augmentation parameter for the ADMM
 # "K" The number of partitions
-# "funname" Name of the penalty to use, currently support ("scad","mcp")
+# "funname" Name of the penalty to use, currently support ("scad", "mcp")
 # "maxstep" Maximum number of iterations allowed
 # "eps" The tolerance parameter for convergence
 # "intercept" Whether to include the intercept into the model
-# value: The absolute estimation error of the coefficient and the running time
+# value: The absolute estimation error, the running time and the number of iterations
 n = 300000
 p = 100
 K = 100
