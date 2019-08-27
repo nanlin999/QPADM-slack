@@ -102,7 +102,22 @@ arma::mat QPADMslackCPP(arma::vec y, arma::mat x, double tau, double lambda, dou
   while((distance > eps)&&(iteration < maxstep)){
     auto start = std::chrono::high_resolution_clock::now();
     if(funname == "mcp"){
-      for(int j=0;j<p;j++){
+      if(intercept){
+        beta(0) = zini(0)+uini(0)/pho;
+        for(int j=1;j<p;j++){
+          double phi = zini(j)+uini(j)/pho;
+          arma::vec xx(3, fill::zeros);
+          xx(0) = sign(phi)*min(a*lambda, max(0.0, a*(pho*abs(phi)-lambda)/(pho*a-1)));
+          xx(1) = sign(phi)*max(a*lambda, abs(phi));
+          arma::vec h(3, fill::zeros);
+          for(int i = 0; i < 3; i++){
+            h(i) = 0.5*(xx(i)-phi)*(xx(i)-phi)+gmcp(xx(i), lambda, a)/pho; 
+          }
+          beta(j) = xx(h.index_min());
+        }
+      }
+      else{
+        for(int j=0;j<p;j++){
         double phi = zini(j)+uini(j)/pho;
         arma::vec xx(3, fill::zeros);
         xx(0) = sign(phi)*min(a*lambda, max(0.0, a*(pho*abs(phi)-lambda)/(pho*a-1)));
@@ -112,10 +127,27 @@ arma::mat QPADMslackCPP(arma::vec y, arma::mat x, double tau, double lambda, dou
           h(i) = 0.5*(xx(i)-phi)*(xx(i)-phi)+gmcp(xx(i), lambda, a)/pho; 
         }
         beta(j) = xx(h.index_min());
+       }
       }
     }
     else{
-      for(int j = 0; j < p; j++){
+      if(intercept){
+        beta(0) = zini(0)+uini(0)/pho;
+        for(int j = 1; j < p; j++){
+          double phi = zini(j)+uini(j)/pho;
+          arma::vec xx(4, fill::zeros);
+          xx(0) = sign(phi)*min(lambda, max(0.0, abs(phi)-lambda/pho));
+          xx(1) = sign(phi)*min(a*lambda, max(lambda, (pho*(a-1)*abs(phi)-a*lambda)/(pho*(a-1)-1)));
+          xx(2) = sign(phi)*max(a*lambda, abs(phi));
+          arma::vec h(4, fill::zeros);
+          for(int i = 0; i < 4; i++){
+            h(i) = 0.5*(xx(i)-phi)*(xx(i)-phi)+gscad(xx(i), lambda, a)/pho; 
+          }
+          beta(j) = xx(h.index_min());
+        }   
+      }
+      else{
+       for(int j = 0; j < p; j++){
         double phi = zini(j)+uini(j)/pho;
         arma::vec xx(4, fill::zeros);
         xx(0) = sign(phi)*min(lambda, max(0.0, abs(phi)-lambda/pho));
@@ -126,6 +158,7 @@ arma::mat QPADMslackCPP(arma::vec y, arma::mat x, double tau, double lambda, dou
           h(i) = 0.5*(xx(i)-phi)*(xx(i)-phi)+gscad(xx(i), lambda, a)/pho; 
         }
         beta(j) = xx(h.index_min());
+       }
       }
     }
     xi = yx+etaini+vini/pho-tau*arma::ones(n)/pho;
